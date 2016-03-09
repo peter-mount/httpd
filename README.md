@@ -2,6 +2,7 @@ This is a simple httpd server based on the latestApache HTTPClient, extending it
 
 Quick example until I write proper documentation.
 
+```java
 import onl.area51.httpd.HttpAction;
 import onl.area51.httpd.HttpServer;
 import onl.area51.httpd.HttpServerBuilder;
@@ -36,3 +37,4 @@ public class Test
         server.stop();
     }
 }
+```
