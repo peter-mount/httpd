@@ -6,7 +6,7 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     
-    <name>Area51 HTTPD</name>
+    <name>HTTPD</name>
     
     <description>
         A basic WebServer framework extending HTTP Components server
