@@ -56,7 +56,7 @@ public interface HttpAction
 
     static boolean isOk( HttpResponse resp )
     {
-        return resp.getStatusLine() == null && resp.getEntity() == null;
+        return (resp.getStatusLine() == null || resp.getStatusLine().getStatusCode() == HttpStatus.SC_OK) && resp.getEntity() == null;
     }
 
     /**

@@ -15,6 +15,7 @@
  */
 package onl.area51.httpd;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -25,9 +26,9 @@ import java.util.logging.Logger;
 import org.apache.http.HttpStatus;
 import org.apache.http.protocol.HttpRequestHandler;
 import static onl.area51.httpd.HttpAction.sendError;
-import static onl.area51.httpd.HttpAction.sendError;
-import static onl.area51.httpd.HttpAction.sendError;
-import static onl.area51.httpd.HttpAction.sendError;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpException;
+import org.apache.http.StatusLine;
 
 /**
  * Build's a {@link HttpRequestHandler} from one or more {@link HttpAction}'s associated with a method
@@ -64,10 +65,7 @@ public interface HttpRequestHandlerBuilder
          */
         HttpRequestHandlerBuilder end();
 
-        default ChainBuilder log( Logger logger )
-        {
-            return add( ( req, resp, ctx ) -> logger.log( Level.INFO, () -> req.getRequestLine().getMethod() + ": " + req.getRequestLine().getUri() ) );
-        }
+        ChainBuilder log( Logger logger, Level level );
 
         /**
          * Respond with an error
@@ -124,7 +122,17 @@ public interface HttpRequestHandlerBuilder
                 HttpRequestHandlerBuilder b = this;
                 return new ChainBuilder()
                 {
-                    HttpAction action;
+                    private HttpAction action;
+                    private Logger logger;
+                    private Level level;
+
+                    @Override
+                    public ChainBuilder log( Logger logger, Level level )
+                    {
+                        this.logger = logger;
+                        this.level = level;
+                        return this;
+                    }
 
                     @Override
                     public ChainBuilder add( HttpAction action )
@@ -138,6 +146,40 @@ public interface HttpRequestHandlerBuilder
                     public HttpRequestHandlerBuilder end()
                     {
                         Objects.requireNonNull( action, "No action defined for " + method );
+
+                        // Wrap the action with our logger
+                        if( logger != null && level != null ) {
+                            // Store the current action here else we'll go into an infinite loop
+                            HttpAction wrappedAction = action;
+                            action = ( req, resp, ctx ) -> {
+                                try {
+                                    logger.log( level, () -> req.getRequestLine().getMethod() + ": " + req.getRequestLine().getUri() );
+
+                                    wrappedAction.apply( req, resp, ctx );
+
+                                    if( logger.isLoggable( level ) ) {
+                                        StatusLine statusLine = resp.getStatusLine();
+                                        HttpEntity entity = resp.getEntity();
+                                        logger.log( level, () -> req.getRequestLine().getMethod() + ": " + req.getRequestLine().getUri()
+                                                                 + " " + (statusLine == null ? -1 : statusLine.getStatusCode())
+                                                                 + " " + (entity == null ? -1 : entity.getContentLength()) );
+                                    }
+                                }
+                                catch( RuntimeException |
+                                       HttpException |
+                                       IOException ex ) {
+                                    if( logger.isLoggable( level ) ) {
+                                        StatusLine statusLine = resp.getStatusLine();
+                                        HttpEntity entity = resp.getEntity();
+                                        logger.log( level, ex, () -> req.getRequestLine().getMethod() + ": " + req.getRequestLine().getUri()
+                                                                     + " " + (statusLine == null ? -1 : statusLine.getStatusCode())
+                                                                     + " " + (entity == null ? -1 : entity.getContentLength()) );
+                                    }
+                                    throw ex;
+                                }
+                            };
+                        }
+
                         actions.merge( method.toUpperCase( Locale.ROOT ), action, HttpAction::andThen );
                         return b;
                     }
