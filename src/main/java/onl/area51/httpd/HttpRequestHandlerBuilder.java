@@ -15,7 +15,6 @@
  */
 package onl.area51.httpd;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -26,9 +25,6 @@ import java.util.logging.Logger;
 import org.apache.http.HttpStatus;
 import org.apache.http.protocol.HttpRequestHandler;
 import static onl.area51.httpd.HttpAction.sendError;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpException;
-import org.apache.http.StatusLine;
 
 /**
  * Build's a {@link HttpRequestHandler} from one or more {@link HttpAction}'s associated with a method
@@ -37,6 +33,8 @@ import org.apache.http.StatusLine;
  */
 public interface HttpRequestHandlerBuilder
 {
+
+    HttpRequestHandlerBuilder log( Logger logger, Level level );
 
     ChainBuilder method( String method );
 
@@ -115,12 +113,22 @@ public interface HttpRequestHandlerBuilder
         {
             Map<String, HttpAction> actions = new ConcurrentHashMap<>();
             Map<String, String> links = null;
+            Logger logger;
+            Level level;
+
+            @Override
+            public HttpRequestHandlerBuilder log( Logger logger, Level level )
+            {
+                this.logger = logger;
+                this.level = level;
+                return this;
+            }
 
             @Override
             public ChainBuilder method( String method )
             {
                 HttpRequestHandlerBuilder b = this;
-                return new ChainBuilder()
+                ChainBuilder c = new ChainBuilder()
                 {
                     private HttpAction action;
                     private Logger logger;
@@ -149,41 +157,15 @@ public interface HttpRequestHandlerBuilder
 
                         // Wrap the action with our logger
                         if( logger != null && level != null ) {
-                            // Store the current action here else we'll go into an infinite loop
-                            HttpAction wrappedAction = action;
-                            action = ( req, resp, ctx ) -> {
-                                try {
-                                    logger.log( level, () -> req.getRequestLine().getMethod() + ": " + req.getRequestLine().getUri() );
-
-                                    wrappedAction.apply( req, resp, ctx );
-
-                                    if( logger.isLoggable( level ) ) {
-                                        StatusLine statusLine = resp.getStatusLine();
-                                        HttpEntity entity = resp.getEntity();
-                                        logger.log( level, () -> req.getRequestLine().getMethod() + ": " + req.getRequestLine().getUri()
-                                                                 + " " + (statusLine == null ? -1 : statusLine.getStatusCode())
-                                                                 + " " + (entity == null ? -1 : entity.getContentLength()) );
-                                    }
-                                }
-                                catch( RuntimeException |
-                                       HttpException |
-                                       IOException ex ) {
-                                    if( logger.isLoggable( level ) ) {
-                                        StatusLine statusLine = resp.getStatusLine();
-                                        HttpEntity entity = resp.getEntity();
-                                        logger.log( level, ex, () -> req.getRequestLine().getMethod() + ": " + req.getRequestLine().getUri()
-                                                                     + " " + (statusLine == null ? -1 : statusLine.getStatusCode())
-                                                                     + " " + (entity == null ? -1 : entity.getContentLength()) );
-                                    }
-                                    throw ex;
-                                }
-                            };
+                            action = new LogAction( logger, level, action );
                         }
 
                         actions.merge( method.toUpperCase( Locale.ROOT ), action, HttpAction::andThen );
                         return b;
                     }
                 };
+
+                return c;
             }
 
             @Override
@@ -219,11 +201,15 @@ public interface HttpRequestHandlerBuilder
                     actions.put( "HEAD", actions.get( "GET" ) );
                 }
 
-                return ( request, response, context ) -> actions.getOrDefault(
+                HttpAction router = ( request, response, context ) -> actions.getOrDefault(
                         request.getRequestLine().getMethod().toUpperCase( Locale.ROOT ),
                         ( req, resp, ctx ) -> sendError( resp, HttpStatus.SC_METHOD_NOT_ALLOWED, "Method not allowed" )
                 )
                         .apply( request, response, context );
+
+                HttpAction action = logger == null || level == null ? router : new LogAction( logger, level, router );
+
+                return ( request, response, context ) -> action.apply( request, response, context );
             }
         };
     }
