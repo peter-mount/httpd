@@ -166,7 +166,13 @@ public interface HtmlBuilder<T>
 
     HtmlBuilder<T> addStyle( String s );
 
-    HtmlBuilder<HtmlBuilder<T>> tag( String t )
+    default HtmlBuilder<HtmlBuilder<T>> tag( String t )
+            throws IOException
+    {
+        return tag( t, false );
+    }
+
+    HtmlBuilder<HtmlBuilder<T>> tag( String t, boolean disableMini )
             throws IOException;
 
     T build()
@@ -201,6 +207,7 @@ public interface HtmlBuilder<T>
         private final Supplier<T> supplier;
         private final Writer writer;
         private final String tag;
+        private final boolean disableMini;
         private boolean body;
         private String clazz, style;
 
@@ -210,14 +217,16 @@ public interface HtmlBuilder<T>
             this.supplier = supplier;
             this.writer = writer;
             this.tag = tag;
+            this.disableMini = false;
         }
 
-        public Builder( T parent, Writer writer, String tag )
+        public Builder( T parent, Writer writer, String tag, boolean disableMini )
         {
             this.parent = parent;
             this.supplier = null;
             this.writer = writer;
             this.tag = tag;
+            this.disableMini = disableMini;
         }
 
         public Builder( Supplier<T> supplier, Writer writer, String tag )
@@ -226,6 +235,7 @@ public interface HtmlBuilder<T>
             this.supplier = supplier;
             this.writer = writer;
             this.tag = tag;
+            this.disableMini = false;
         }
 
         @Override
@@ -238,7 +248,11 @@ public interface HtmlBuilder<T>
             else if( tag == null ) {
                 return parent;
             }
-            else if( body ) {
+
+            if( disableMini ) {
+                startBody();
+            }
+            if( body ) {
                 writer.append( '<' );
                 writer.append( '/' );
                 writer.append( tag );
@@ -248,6 +262,7 @@ public interface HtmlBuilder<T>
                 writer.append( '/' );
                 writer.append( '>' );
             }
+
             return parent;
         }
 
@@ -274,13 +289,13 @@ public interface HtmlBuilder<T>
         }
 
         @Override
-        public HtmlBuilder<HtmlBuilder<T>> tag( String t )
+        public HtmlBuilder<HtmlBuilder<T>> tag( String t, boolean disableMini )
                 throws IOException
         {
             startBody();
             writer.append( '<' );
             writer.append( t );
-            return new Builder<>( this, writer, t );
+            return new Builder<>( this, writer, t, disableMini );
         }
 
         @Override

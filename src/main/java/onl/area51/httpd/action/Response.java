@@ -17,6 +17,9 @@ package onl.area51.httpd.action;
 
 import java.io.CharArrayWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import org.apache.http.HttpEntity;
@@ -70,14 +73,43 @@ public interface Response
         return write( String.valueOf( v ) );
     }
 
+    default Response copy( InputStream is )
+            throws IOException
+    {
+        try( Reader r = new InputStreamReader( is ) ) {
+            return copy( r );
+        }
+    }
+
+    default Response copy( Reader r )
+            throws IOException
+    {
+        char b[] = new char[1024];
+        int s = r.read( b );
+        while( s > -1 ) {
+            write( b, 0, s );
+            s = r.read( b );
+        }
+        return this;
+    }
+
     Response exec( Action a )
             throws IOException,
                    HttpException;
 
-    Response begin( String t )
+    default Response begin( String t )
+            throws IOException
+    {
+        return begin( t, false );
+    }
+
+    Response begin( String t, boolean disableMini )
             throws IOException;
 
     Response end()
+            throws IOException;
+
+    Response endAll()
             throws IOException;
 
     Response attr( String n, CharSequence v )
@@ -110,6 +142,123 @@ public interface Response
         return attr( n, String.valueOf( v ) );
     }
 
+    default Response id( String id )
+            throws IOException
+    {
+        return attr( "id", id );
+    }
+
+    default Response _class( String c )
+            throws IOException
+    {
+        return attr( "class", c );
+    }
+
+    default Response style( String s )
+            throws IOException
+    {
+        return attr( "style", s );
+    }
+
+    default Response a()
+            throws IOException
+    {
+        return begin( "a", true );
+    }
+
+    default Response a( String link )
+            throws IOException
+    {
+        return a().attr( "href", link );
+    }
+
+    default Response a( String link, String text )
+            throws IOException
+    {
+        return a( link ).write( text ).end();
+    }
+
+    default Response br()
+            throws IOException
+    {
+        return begin( "br" ).end();
+    }
+
+    default Response div()
+            throws IOException
+    {
+        return begin( "div", true );
+    }
+
+    default Response h1()
+            throws IOException
+    {
+        return begin( "h1", true );
+    }
+
+    default Response h2()
+            throws IOException
+    {
+        return begin( "h2", true );
+    }
+
+    default Response h3()
+            throws IOException
+    {
+        return begin( "h3", true );
+    }
+
+    default Response h4()
+            throws IOException
+    {
+        return begin( "h4", true );
+    }
+
+    default Response h5()
+            throws IOException
+    {
+        return begin( "h5", true );
+    }
+
+    default Response h6()
+            throws IOException
+    {
+        return begin( "h6", true );
+    }
+
+    default Response linkStylesheet( String src )
+            throws IOException
+    {
+        return begin( "link" )
+                .attr( "rel", "stylesheet" )
+                .attr( "href", src )
+                .end();
+    }
+
+    default Response p()
+            throws IOException
+    {
+        return begin( "p", true );
+    }
+
+    default Response span()
+            throws IOException
+    {
+        return begin( "span", true );
+    }
+
+    default Response script()
+            throws IOException
+    {
+        return begin( "script", true );
+    }
+
+    default Response script( String src )
+            throws IOException
+    {
+        return script().attr( "src", src ).end();
+    }
+
     HttpEntity getEntity()
             throws IOException;
 
@@ -121,12 +270,21 @@ public interface Response
         {
 
             private final String tag;
+            private final boolean disableMini;
             private boolean body;
 
-            public State( String tag )
+            public State( String tag, boolean disableMini )
             {
                 this.tag = tag;
+                this.disableMini = disableMini;
             }
+
+            @Override
+            public String toString()
+            {
+                return tag;
+            }
+
         }
 
         CharArrayWriter writer = new CharArrayWriter();
@@ -135,7 +293,7 @@ public interface Response
         {
             private ContentType contentType = ContentType.TEXT_HTML;
 
-            private final Deque<State> deque = new ArrayDeque<>();
+            private Deque<State> deque = new ArrayDeque<>();
             private State state;
 
             @Override
@@ -144,8 +302,20 @@ public interface Response
                            HttpException
             {
                 if( a != null ) {
+                    // Ensure we have finished the current tag
                     startBody();
-                    a.apply( request );
+
+                    // Now preserve the stack & start a new one.
+                    // This means one action cannot affect the state of this one
+                    final Deque<State> orig = deque;
+                    deque = new ArrayDeque<>();
+                    try {
+                        a.apply( request );
+                    }
+                    finally {
+                        endAll();
+                        deque = orig;
+                    }
                 }
                 return this;
             }
@@ -210,14 +380,17 @@ public interface Response
             }
 
             @Override
-            public Response begin( String t )
+            public Response begin( String t, boolean disableMini )
                     throws IOException
             {
-                if( state != null ) {
-                    deque.offerLast( state );
-                }
                 startBody();
-                state = new State( t );
+
+                if( state != null ) {
+                    deque.addLast( state );
+                }
+
+                state = new State( t, disableMini );
+
                 writer.append( '<' );
                 writer.write( state.tag );
                 return this;
@@ -227,6 +400,15 @@ public interface Response
             public Response end()
                     throws IOException
             {
+                if( state == null ) {
+                    throw new IllegalStateException( "end() called outside of tag" );
+                }
+
+                // elements like script mustn't be minified, i.e. <script/> is invalid must be <script></script>
+                if( state.disableMini ) {
+                    startBody();
+                }
+
                 if( state.body ) {
                     writer.append( '<' );
                     writer.append( '/' );
@@ -237,7 +419,19 @@ public interface Response
                     writer.append( '/' );
                     writer.append( '>' );
                 }
+
                 state = deque.pollLast();
+
+                return this;
+            }
+
+            @Override
+            public Response endAll()
+                    throws IOException
+            {
+                while( !deque.isEmpty() ) {
+                    end();
+                }
                 return this;
             }
 

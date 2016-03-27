@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import javax.net.ServerSocketFactory;
 import javax.net.ssl.SSLContext;
 import org.apache.http.ConnectionClosedException;
@@ -91,6 +92,23 @@ public interface HttpServerBuilder
     HttpServerBuilder setExceptionLogger( ExceptionLogger exceptionLogger, boolean filter );
 
     HttpServerBuilder shutdown( long gracePeriod, TimeUnit gracePeriodUnit );
+
+    /**
+     * Notify a consumer of this builder.
+     * <p>
+     * An example is notifying CDI beans observing the builder class. Use it with {@code builder.notify( CDI.current().getBeanManager()::fireEvent )} and it
+     * will notify each bean
+     * with the builder, allowing them to add to the server configuration.
+     *
+     * @param action
+     *
+     * @return
+     */
+    default HttpServerBuilder notify( Consumer<HttpServerBuilder> action )
+    {
+        action.accept( this );
+        return this;
+    }
 
     HttpServer build();
 
