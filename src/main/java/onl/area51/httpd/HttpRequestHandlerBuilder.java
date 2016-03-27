@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 import org.apache.http.HttpStatus;
 import org.apache.http.protocol.HttpRequestHandler;
 import static onl.area51.httpd.HttpAction.sendError;
+import onl.area51.httpd.action.Action;
 
 /**
  * Build's a {@link HttpRequestHandler} from one or more {@link HttpAction}'s associated with a method
@@ -35,6 +36,16 @@ public interface HttpRequestHandlerBuilder
 {
 
     HttpRequestHandlerBuilder log( Logger logger, Level level );
+
+    default HttpRequestHandlerBuilder log( Level level )
+    {
+        return log( Logger.getGlobal(), level );
+    }
+
+    default HttpRequestHandlerBuilder log()
+    {
+        return log( Logger.getGlobal(), Level.INFO );
+    }
 
     ChainBuilder method( String method );
 
@@ -53,6 +64,11 @@ public interface HttpRequestHandlerBuilder
          * @return
          */
         ChainBuilder add( HttpAction action );
+
+        default ChainBuilder add( Action action )
+        {
+            return add( action.wrap() );
+        }
 
         /**
          * Complete the chain.
