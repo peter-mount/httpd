@@ -44,32 +44,50 @@ public interface ActionBuilder
     /**
      * Exposes resources under META-INF/resources like you can in servlet web-fragments.
      *
+     * @param clazz
      * @return
      */
-    static Action resourceAction()
+    static Action resourceAction( Class<?> clazz )
     {
-        return r -> renderResource( r, r.getURI() );
+        return r -> renderResource( clazz, r, r.getURI() );
     }
 
     /**
      * Renders a specific resource from META-INF/resources, usually static content
      *
-     * @param uri
+     * @param clazz Class from which to perform the search
+     * @param uri   URI to retrieve
      *
      * @return
      */
-    static Action resourceAction( String uri )
+    static Action resourceAction( Class<?> clazz, String uri )
     {
         URI u = URI.create( uri );
-        return r -> renderResource( r, u );
+        return r -> renderResource( clazz, r, u );
     }
 
-    static Action resourceAction( URI uri )
+    /**
+     * Renders a specific resource from META-INF/resources, usually static content
+     *
+     * @param clazz Class from which to perform the search
+     * @param uri   URI to retrieve
+     *
+     * @return
+     */
+    static Action resourceAction( Class<?> clazz, URI uri )
     {
-        return r -> renderResource( r, uri );
+        return r -> renderResource( clazz, r, uri );
     }
 
-    static void renderResource( Request r, URI uri )
+    /**
+     * Renders a specific resource from META-INF/resources, usually static content
+     *
+     * @param clazz Class from which to perform the search
+     * @param r     Request
+     * @param uri   URI to retrieve
+     * @throws java.io.IOException
+     */
+    static void renderResource( Class<?> clazz, Request r, URI uri )
             throws IOException
     {
         String url = uri.getPath();
@@ -84,7 +102,7 @@ public interface ActionBuilder
             if( path.endsWith( "/" ) ) {
                 path = path + "index.html";
             }
-            InputStream is = ActionBuilder.class.getResourceAsStream( path );
+            InputStream is = clazz.getResourceAsStream( path );
             if( is == null ) {
                 Action.sendError( r, HttpStatus.SC_NOT_FOUND, url );
             }
