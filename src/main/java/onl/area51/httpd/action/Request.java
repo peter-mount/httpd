@@ -15,8 +15,20 @@
  */
 package onl.area51.httpd.action;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.protocol.HttpContext;
@@ -38,6 +50,28 @@ public interface Request
     HttpResponse getHttpResponse();
 
     HttpContext getHttpContext();
+
+    Collection<String> getParamNames()
+            throws IOException;
+
+    URI getURI()
+            throws IOException;
+
+    default Stream<String> paramNames()
+            throws IOException
+    {
+        return getParamNames().stream();
+    }
+
+    String getParam( String n )
+            throws IOException;
+
+    default int getParamInt( String n )
+            throws IOException
+    {
+        String s = getParam( n );
+        return s == null ? 0 : Integer.parseInt( s );
+    }
 
     default Object getAttribute( String n )
     {
@@ -101,6 +135,62 @@ public interface Request
         return new Request()
         {
             Response response;
+            URI uri;
+            Map<String, String> params;
+
+            private String decode( String s )
+            {
+                try {
+                    return URLDecoder.decode( s, "UTF-8" );
+                }
+                catch( UnsupportedEncodingException ex ) {
+                    return s;
+                }
+            }
+
+            private void decodeParams()
+                    throws IOException
+            {
+                if( uri == null ) {
+                    try {
+                        uri = new URI( req.getRequestLine().getUri() );
+
+                        String q = uri.getQuery();
+                        params = q == null || q.isEmpty()
+                                 ? Collections.emptyMap()
+                                 : Stream.of( q.split( "&" ) )
+                                .map( s -> s.split( "=", 2 ) )
+                                .collect( Collectors.toMap( p -> decode( p[0] ), p -> p.length == 1 ? "" : decode( p[1] ) ) );
+                    }
+                    catch( URISyntaxException ex ) {
+                        throw new IOException( ex );
+                    }
+                }
+            }
+
+            @Override
+            public URI getURI()
+                    throws IOException
+            {
+                decodeParams();
+                return uri;
+            }
+
+            @Override
+            public Collection<String> getParamNames()
+                    throws IOException
+            {
+                decodeParams();
+                return params.keySet();
+            }
+
+            @Override
+            public String getParam( String n )
+                    throws IOException
+            {
+                decodeParams();
+                return params.get( n );
+            }
 
             @Override
             public Response getResponse()
@@ -165,6 +255,27 @@ public interface Request
         Request delegate = this;
         return new Request()
         {
+            @Override
+            public URI getURI()
+                    throws IOException
+            {
+                return delegate.getURI();
+            }
+
+            @Override
+            public Collection<String> getParamNames()
+                    throws IOException
+            {
+                return delegate.getParamNames();
+            }
+
+            @Override
+            public String getParam( String n )
+                    throws IOException
+            {
+                return delegate.getParam( n );
+            }
+
             @Override
             public Response getResponse()
             {

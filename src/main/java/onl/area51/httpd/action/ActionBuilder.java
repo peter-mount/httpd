@@ -15,13 +15,9 @@
  */
 package onl.area51.httpd.action;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.net.URI;
 import onl.area51.httpd.util.ContentTypeResolver;
 import org.apache.http.HttpStatus;
 import org.apache.http.entity.InputStreamEntity;
@@ -52,7 +48,7 @@ public interface ActionBuilder
      */
     static Action resourceAction()
     {
-        return r -> renderResource( r, r.getHttpRequest().getRequestLine().getUri() );
+        return r -> renderResource( r, r.getURI() );
     }
 
     /**
@@ -64,13 +60,19 @@ public interface ActionBuilder
      */
     static Action resourceAction( String uri )
     {
+        URI u = URI.create( uri );
+        return r -> renderResource( r, u );
+    }
+
+    static Action resourceAction( URI uri )
+    {
         return r -> renderResource( r, uri );
     }
 
-    static void renderResource( Request r, String uri )
+    static void renderResource( Request r, URI uri )
             throws IOException
     {
-        String url = uri;
+        String url = uri.getPath();
         if( url.contains( "//" ) ) {
             url = url.replace( "//", "/" );
         }
