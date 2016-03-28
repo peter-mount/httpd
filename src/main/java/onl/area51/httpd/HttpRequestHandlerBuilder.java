@@ -24,8 +24,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.http.HttpStatus;
 import org.apache.http.protocol.HttpRequestHandler;
-import static onl.area51.httpd.HttpAction.sendError;
 import onl.area51.httpd.action.Action;
+import onl.area51.httpd.action.Actions;
+import onl.area51.httpd.action.Request;
 
 /**
  * Build's a {@link HttpRequestHandler} from one or more {@link HttpAction}'s associated with a method
@@ -63,12 +64,7 @@ public interface HttpRequestHandlerBuilder
          *
          * @return
          */
-        ChainBuilder add( HttpAction action );
-
-        default ChainBuilder add( Action action )
-        {
-            return add( action.wrap() );
-        }
+        ChainBuilder add( Action action );
 
         /**
          * Complete the chain.
@@ -78,8 +74,6 @@ public interface HttpRequestHandlerBuilder
          * @return
          */
         HttpRequestHandlerBuilder end();
-
-        ChainBuilder log( Logger logger, Level level );
 
         /**
          * Respond with an error
@@ -103,8 +97,7 @@ public interface HttpRequestHandlerBuilder
          */
         default HttpRequestHandlerBuilder sendError( int code, String message )
         {
-            return add( ( req, resp, ctx ) -> HttpAction.sendError( resp, code, message ) )
-                    .end();
+            return add( r -> Actions.sendError( r, code, message ) ).end();
         }
 
         /**
@@ -118,8 +111,7 @@ public interface HttpRequestHandlerBuilder
          */
         default HttpRequestHandlerBuilder sendError( int code, String fmt, Object... args )
         {
-            return add( ( req, resp, ctx ) -> HttpAction.sendError( resp, code, fmt, args ) )
-                    .end();
+            return add( r -> Actions.sendError( r, code, fmt, args ) ).end();
         }
     }
 
@@ -127,7 +119,7 @@ public interface HttpRequestHandlerBuilder
     {
         return new HttpRequestHandlerBuilder()
         {
-            Map<String, HttpAction> actions = new ConcurrentHashMap<>();
+            Map<String, Action> actions = new ConcurrentHashMap<>();
             Map<String, String> links = null;
             Logger logger;
             Level level;
@@ -146,20 +138,10 @@ public interface HttpRequestHandlerBuilder
                 HttpRequestHandlerBuilder b = this;
                 ChainBuilder c = new ChainBuilder()
                 {
-                    private HttpAction action;
-                    private Logger logger;
-                    private Level level;
+                    private Action action;
 
                     @Override
-                    public ChainBuilder log( Logger logger, Level level )
-                    {
-                        this.logger = logger;
-                        this.level = level;
-                        return this;
-                    }
-
-                    @Override
-                    public ChainBuilder add( HttpAction action )
+                    public ChainBuilder add( Action action )
                     {
                         Objects.requireNonNull( action );
                         this.action = this.action == null ? action : this.action.andThen( action );
@@ -171,12 +153,7 @@ public interface HttpRequestHandlerBuilder
                     {
                         Objects.requireNonNull( action, "No action defined for " + method );
 
-                        // Wrap the action with our logger
-                        if( logger != null && level != null ) {
-                            action = new LogAction( logger, level, action );
-                        }
-
-                        actions.merge( method.toUpperCase( Locale.ROOT ), action, HttpAction::andThen );
+                        actions.merge( method.toUpperCase( Locale.ROOT ), action, Action::andThen );
                         return b;
                     }
                 };
@@ -217,15 +194,25 @@ public interface HttpRequestHandlerBuilder
                     actions.put( "HEAD", actions.get( "GET" ) );
                 }
 
-                HttpAction router = ( request, response, context ) -> actions.getOrDefault(
-                        request.getRequestLine().getMethod().toUpperCase( Locale.ROOT ),
-                        ( req, resp, ctx ) -> sendError( resp, HttpStatus.SC_METHOD_NOT_ALLOWED, "Method not allowed" )
+                Action router = r -> actions.getOrDefault(
+                        r.getHttpRequest().getRequestLine().getMethod().toUpperCase( Locale.ROOT ),
+                        r1 -> Actions.sendError( r1, HttpStatus.SC_METHOD_NOT_ALLOWED, "Method not allowed" )
                 )
-                        .apply( request, response, context );
+                        .apply( r );
 
-                HttpAction action = logger == null || level == null ? router : new LogAction( logger, level, router );
+                Action action = logger == null || level == null ? router : new LogAction( logger, level, router );
 
-                return ( request, response, context ) -> action.apply( request, response, context );
+                return ( req, resp, ctx ) -> {
+                    Request request = Request.create( req, resp, ctx );
+                    try {
+                        action.apply( request );
+                    }
+                    finally {
+                        if( request.isResponsePresent() ) {
+                            resp.setEntity( request.getResponse().getEntity() );
+                        }
+                    }
+                };
             }
         };
     }

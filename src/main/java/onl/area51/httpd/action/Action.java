@@ -17,7 +17,6 @@ package onl.area51.httpd.action;
 
 import java.io.IOException;
 import java.util.Objects;
-import onl.area51.httpd.HttpAction;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
@@ -53,64 +52,9 @@ public interface Action
         return before.andThen( this );
     }
 
-    default HttpAction wrap()
-    {
-        return ( req, resp, ctx ) -> {
-            Request request = Request.create( req, resp, ctx );
-            try {
-                apply( request );
-            }
-            finally {
-                if( request.isResponsePresent() ) {
-                    resp.setEntity( request.getResponse().getEntity() );
-                }
-            }
-        };
-    }
-
     static boolean isOk( Request req )
     {
         HttpResponse resp = req.getHttpResponse();
         return (resp.getStatusLine() == null || resp.getStatusLine().getStatusCode() == HttpStatus.SC_OK) && resp.getEntity() == null;
-    }
-
-    /**
-     * Set the error response
-     *
-     * @param req
-     * @param sc
-     * @param message
-     */
-    static void sendError( Request req, int sc, String message )
-    {
-        HttpResponse response = req.getHttpResponse();
-        response.setStatusCode( sc );
-        response.setEntity( new StringEntity( "<html><body><h1>" + message + "</h1></body></html>", ContentType.TEXT_HTML ) );
-    }
-
-    /**
-     * Set the error response
-     *
-     * @param req
-     * @param sc
-     * @param fmt
-     * @param args
-     */
-    static void sendError( Request req, int sc, String fmt, Object... args )
-    {
-        sendError( req, sc, String.format( fmt, args ) );
-    }
-
-    /**
-     * Send an OK entity
-     *
-     * @param req
-     * @param entity
-     */
-    static void sendOk( Request req, HttpEntity entity )
-    {
-        HttpResponse response = req.getHttpResponse();
-        response.setStatusCode( HttpStatus.SC_OK );
-        response.setEntity( entity );
     }
 }

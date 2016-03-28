@@ -15,6 +15,7 @@
  */
 package onl.area51.httpd;
 
+import onl.area51.httpd.action.ActionRegistry;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
@@ -72,7 +73,33 @@ public interface HttpServerBuilder
 
     HttpServerBuilder setHandlerMapper( HttpRequestHandlerMapper handlerMapper );
 
+    /**
+     * Register a new handler
+     *
+     * @param pattern
+     * @param handler
+     * @return
+     */
     HttpServerBuilder registerHandler( String pattern, HttpRequestHandler handler );
+
+    /**
+     * Register a new handler
+     *
+     * @param pattern
+     * @param handler
+     * @return
+     */
+    default HttpServerBuilder registerHandler( String pattern, HttpRequestHandlerBuilder handler )
+    {
+        return registerHandler( pattern, handler.build() );
+    }
+
+    /**
+     * The builder for the global handler "/*" which is registered last
+     *
+     * @return
+     */
+    HttpRequestHandlerBuilder getGlobalHandlerBuilder();
 
     HttpServerBuilder setExpectationVerifier( HttpExpectationVerifier expectationVerifier );
 
@@ -96,17 +123,33 @@ public interface HttpServerBuilder
     /**
      * Notify a consumer of this builder.
      * <p>
-     * An example is notifying CDI beans observing the builder class. Use it with {@code builder.notify( CDI.current().getBeanManager()::fireEvent )} and it
-     * will notify each bean
-     * with the builder, allowing them to add to the server configuration.
+     * An example is notifying CDI beans observing the builder class. Use it with
+     * {@code builder.notify( CDI.current().getBeanManager()::fireEvent )} and it will notify each bean with the builder,
+     * allowing them to add to the server configuration.
      *
      * @param action
      *
      * @return
      */
-    default HttpServerBuilder notify( Consumer<HttpServerBuilder> action )
+    default HttpServerBuilder notify( Consumer<ActionRegistry> action )
     {
-        action.accept( this );
+        HttpServerBuilder b = this;
+
+        action.accept( new ActionRegistry()
+        {
+            @Override
+            public HttpRequestHandlerBuilder getGlobalHandlerBuilder()
+            {
+                return b.getGlobalHandlerBuilder();
+            }
+
+            @Override
+            public ActionRegistry registerHandler( String pattern, HttpRequestHandler handler )
+            {
+                b.registerHandler( pattern, handler );
+                return this;
+            }
+        } );
         return this;
     }
 
@@ -119,6 +162,7 @@ public interface HttpServerBuilder
             private final ServerBootstrap sb = ServerBootstrap.bootstrap();
             private long gracePeriod = 5;
             private TimeUnit gracePeriodUnit = TimeUnit.MINUTES;
+            private HttpRequestHandlerBuilder globalHandler;
 
             @Override
             public HttpServerBuilder shutdown( long gracePeriod, TimeUnit gracePeriodUnit )
@@ -237,7 +281,8 @@ public interface HttpServerBuilder
             }
 
             @Override
-            public HttpServerBuilder setConnectionFactory( HttpConnectionFactory<? extends DefaultBHttpServerConnection> connectionFactory )
+            public HttpServerBuilder setConnectionFactory(
+                    HttpConnectionFactory<? extends DefaultBHttpServerConnection> connectionFactory )
             {
                 sb.setConnectionFactory( connectionFactory );
                 return this;
@@ -276,8 +321,21 @@ public interface HttpServerBuilder
             }
 
             @Override
+            public HttpRequestHandlerBuilder getGlobalHandlerBuilder()
+            {
+                if( globalHandler == null ) {
+                    globalHandler = HttpRequestHandlerBuilder.create();
+                }
+                return globalHandler;
+            }
+
+            @Override
             public HttpServer build()
             {
+                if( globalHandler != null ) {
+                    sb.registerHandler( "/*", globalHandler.build() );
+                }
+
                 org.apache.http.impl.bootstrap.HttpServer server = sb.create();
                 return new HttpServer()
                 {

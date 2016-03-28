@@ -18,13 +18,14 @@ package onl.area51.httpd;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import onl.area51.httpd.action.Action;
+import onl.area51.httpd.action.Request;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
-import org.apache.http.protocol.HttpContext;
 
 /**
  * Simple HttpAction to log a request
@@ -32,14 +33,14 @@ import org.apache.http.protocol.HttpContext;
  * @author peter
  */
 public class LogAction
-        implements HttpAction
+        implements Action
 {
 
     private final Logger logger;
     private final Level level;
-    private final HttpAction action;
+    private final Action action;
 
-    public LogAction( Logger logger, Level level, HttpAction action )
+    public LogAction( Logger logger, Level level, Action action )
     {
         this.logger = logger;
         this.level = level;
@@ -47,11 +48,12 @@ public class LogAction
     }
 
     @Override
-    public void apply( HttpRequest request, HttpResponse response, HttpContext context )
+    public void apply( Request r )
             throws HttpException,
                    IOException
     {
         try {
+            HttpRequest request = r.getHttpRequest();
             if( request instanceof HttpEntityEnclosingRequest ) {
                 HttpEntityEnclosingRequest req = (HttpEntityEnclosingRequest) request;
                 HttpEntity entity = req.getEntity();
@@ -61,9 +63,10 @@ public class LogAction
                 logger.log( level, () -> request.getRequestLine().getMethod() + ": " + request.getRequestLine().getUri() );
             }
 
-            action.apply( request, response, context );
+            action.apply( r );
 
             if( logger.isLoggable( level ) ) {
+                HttpResponse response = r.getHttpResponse();
                 StatusLine statusLine = response.getStatusLine();
                 HttpEntity entity = response.getEntity();
                 logger.log( level, () -> request.getRequestLine().getMethod() + ": " + request.getRequestLine().getUri()
@@ -74,6 +77,8 @@ public class LogAction
                  HttpException |
                  IOException ex ) {
             if( logger.isLoggable( level ) ) {
+                HttpRequest request = r.getHttpRequest();
+                HttpResponse response = r.getHttpResponse();
                 StatusLine statusLine = response.getStatusLine();
                 HttpEntity entity = response.getEntity();
                 logger.log( level, ex, () -> request.getRequestLine().getMethod() + ": " + request.getRequestLine().getUri()
