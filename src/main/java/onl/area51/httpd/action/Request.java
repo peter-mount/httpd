@@ -20,13 +20,18 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.http.HttpRequest;
@@ -73,9 +78,9 @@ public interface Request
         return s == null ? 0 : Integer.parseInt( s );
     }
 
-    default Object getAttribute( String n )
+    default <T> T getAttribute( String n )
     {
-        return getHttpContext().getAttribute( n );
+        return (T) getHttpContext().getAttribute( n );
     }
 
     default String getString( String n )
@@ -128,6 +133,103 @@ public interface Request
     @Override
     default void close()
     {
+    }
+
+    /**
+     * {@link ZoneId} for UTC which everything in the system runs under
+     */
+    static final ZoneId UTC = ZoneId.of( "UTC" );
+
+    /**
+     * {@link Zoneid} for London used in the front end - i.e. shows correct schedules when Daylight Savings Time is in effect
+     * not those one hour earlier
+     */
+    static final ZoneId LONDON = ZoneId.of( "Europe/London" );
+
+    default Request addHeader( String n, String v )
+    {
+        getHttpResponse().addHeader( n, v );
+        return this;
+    }
+
+    default Request addHeader( String n, Instant i )
+    {
+        return addHeader( n, i.atZone( UTC ) );
+    }
+
+    /*
+    Date:Tue, 29 Mar 2016 12:27:11 GMT
+Expires:Wed, 30 Mar 2016 11:27:11 GMT
+Keep-Alive:timeout=5, max=95
+last-modified:Tue, 29 Mar 2016 12:27:11 GMT
+     */
+    default Request addHeader( String n, ZonedDateTime zdt )
+    {
+        return addHeader( n, String.format( "%3s, %02d %3s %d %02d:%02d:%02d GMT",
+                                            zdt.getDayOfWeek().getDisplayName( TextStyle.SHORT, Locale.ENGLISH ),
+                                            zdt.getDayOfMonth(),
+                                            zdt.getMonth().getDisplayName( TextStyle.SHORT, Locale.ENGLISH ),
+                                            zdt.getYear(),
+                                            zdt.getHour(),
+                                            zdt.getMinute(),
+                                            zdt.getSecond()
+                  ) );
+    }
+
+    default Request addHeader( String n, LocalDateTime dt )
+    {
+        return addHeader( n, dt.atZone( LONDON ) );
+    }
+
+    default Request expires( Instant instant )
+    {
+        return addHeader( "Expires", instant );
+    }
+
+    default Request expires( ZonedDateTime dt )
+    {
+        return addHeader( "Expires", dt );
+    }
+
+    default Request expires( LocalDateTime dt )
+    {
+        return addHeader( "Expires", dt );
+    }
+
+    default Request expiresIn( Duration d )
+    {
+        return expires( LocalDateTime.now().plus( d ) );
+    }
+
+    default Request expiresIn( long v, ChronoUnit unit )
+    {
+        return expiresIn( Duration.of( v, unit ) );
+    }
+
+    default Request lastModified( Instant instant )
+    {
+        return addHeader( "last-modified", instant );
+    }
+
+    default Request lastModified( ZonedDateTime dt )
+    {
+        return addHeader( "last-modified", dt );
+    }
+
+    default Request lastModified( LocalDateTime dt )
+    {
+        return addHeader( "last-modified", dt );
+    }
+
+    default Request maxAge( Duration d )
+    {
+        long max = d.getSeconds();
+        return addHeader( "Cache-Control", "public, max-age=" + max + ", s-maxage=" + max + ", no-transform" );
+    }
+
+    default Request maxAge( long v, ChronoUnit unit )
+    {
+        return maxAge( Duration.of( v, unit ) );
     }
 
     static Request create( HttpRequest req, HttpResponse resp, HttpContext ctx )
