@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.protocol.HttpContext;
@@ -59,6 +60,11 @@ public interface Request
     Collection<String> getParamNames()
             throws IOException;
 
+    default void setEntity( HttpEntity entity )
+    {
+        getHttpResponse().setEntity( entity );
+    }
+
     URI getURI()
             throws IOException;
 
@@ -81,6 +87,17 @@ public interface Request
     default <T> T getAttribute( String n )
     {
         return (T) getHttpContext().getAttribute( n );
+    }
+
+    default Request setAttribute( String n, Object v )
+    {
+        getHttpContext().setAttribute( n, v );
+        return this;
+    }
+
+    default boolean isAttributePresent( String n )
+    {
+        return getHttpContext().getAttribute( n ) != null;
     }
 
     default String getString( String n )

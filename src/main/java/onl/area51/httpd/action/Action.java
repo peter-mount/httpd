@@ -17,12 +17,9 @@ package onl.area51.httpd.action;
 
 import java.io.IOException;
 import java.util.Objects;
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
 
 /**
  *

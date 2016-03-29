@@ -20,7 +20,6 @@ import java.io.InputStream;
 import java.net.URI;
 import onl.area51.httpd.HttpRequestHandlerBuilder;
 import onl.area51.httpd.HttpServerBuilder;
-import onl.area51.httpd.util.ContentTypeResolver;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -73,7 +72,7 @@ public interface Actions
     static void registerClassResourceHandler( HttpServerBuilder builder, Class<?> clazz )
     {
         builder.getGlobalHandlerBuilder()
-                .log()
+                //.log()
                 .method( "GET" )
                 .add( Actions.resourceAction( clazz ) )
                 .end();
@@ -99,7 +98,7 @@ public interface Actions
                                   .add( r -> renderResource( Actions.class, r, uri500, base ) )
                                   .end() )
                 .getGlobalHandlerBuilder()
-                .log()
+                //.log()
                 .method( "GET" )
                 .add( Actions.notFoundAction() )
                 .end();

@@ -142,6 +142,12 @@ public interface Response
         return attr( n, String.valueOf( v ) );
     }
 
+    default Response attr( String n, boolean v )
+            throws IOException
+    {
+        return attr( n, v ? "t" : "f" );
+    }
+
     default Response id( String id )
             throws IOException
     {
@@ -224,6 +230,36 @@ public interface Response
             throws IOException
     {
         return begin( "h6", true );
+    }
+
+    default Response table()
+            throws IOException
+    {
+        return begin( "table", true );
+    }
+
+    default Response tr()
+            throws IOException
+    {
+        return begin( "tr", true );
+    }
+
+    default Response th()
+            throws IOException
+    {
+        return begin( "th", true );
+    }
+
+    default Response td()
+            throws IOException
+    {
+        return begin( "td", true );
+    }
+
+    default Response input()
+            throws IOException
+    {
+        return begin( "td", true );
     }
 
     default Response linkStylesheet( String src )

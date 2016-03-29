@@ -66,6 +66,24 @@ public interface HttpRequestHandlerBuilder
          */
         ChainBuilder add( Action action );
 
+        default ChainBuilder ifResponsePresent( Action action )
+        {
+            return add( r -> {
+                if( r.isResponsePresent() ) {
+                    action.apply( r );
+                }
+            } );
+        }
+
+        default ChainBuilder ifAttributePresent( String n, Action action )
+        {
+            return add( r -> {
+                if( r.isAttributePresent( n ) ) {
+                    action.apply( r );
+                }
+            } );
+        }
+
         /**
          * Complete the chain.
          * <p>
@@ -112,6 +130,53 @@ public interface HttpRequestHandlerBuilder
         default HttpRequestHandlerBuilder sendError( int code, String fmt, Object... args )
         {
             return add( r -> Actions.sendError( r, code, fmt, args ) ).end();
+        }
+
+        /**
+         * Respond with an error
+         *
+         * @param code HTTP status code
+         *
+         * @return
+         */
+        default HttpRequestHandlerBuilder errorIfAttributeAbsent( String n, int code )
+        {
+            return errorIfAttributeAbsent( n, code, String.valueOf( code ) );
+        }
+
+        /**
+         * Respond with an error
+         *
+         * @param code    HTTP status code
+         * @param message Message
+         *
+         * @return
+         */
+        default HttpRequestHandlerBuilder errorIfAttributeAbsent( String n, int code, String message )
+        {
+            return add( r -> {
+                if( !r.isAttributePresent( n ) ) {
+                    Actions.sendError( r, code, message );
+                }
+            } ).end();
+        }
+
+        /**
+         * Respond with an error
+         *
+         * @param code HTTP status code
+         * @param fmt  Format
+         * @param args arguments
+         *
+         * @return
+         */
+        default HttpRequestHandlerBuilder errorIfAttributeAbsent( String n, int code, String fmt, Object... args )
+        {
+            return add( r -> {
+                if( !r.isAttributePresent( n ) ) {
+                    Actions.sendError( r, code, fmt, args );
+                }
+            } ).end();
         }
     }
 
