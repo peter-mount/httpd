@@ -259,7 +259,7 @@ public interface Response
     default Response input()
             throws IOException
     {
-        return begin( "td", true );
+        return begin( "input", true );
     }
 
     default Response linkStylesheet( String src )
