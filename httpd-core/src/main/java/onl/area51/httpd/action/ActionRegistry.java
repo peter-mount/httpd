@@ -22,7 +22,8 @@ import org.apache.http.HttpResponseInterceptor;
 import org.apache.http.protocol.HttpRequestHandler;
 
 /**
- * Interface used by {@link HttpServerBuilder#notify(java.util.function.Consumer) } so we can notify beans to deploy themselves but not allow access to the server config
+ * Interface used by {@link HttpServerBuilder#notify(java.util.function.Consumer) } so we can notify beans to deploy themselves but not allow access to the
+ * server config
  */
 public interface ActionRegistry
 {
@@ -39,6 +40,7 @@ public interface ActionRegistry
      *
      * @param pattern
      * @param handler
+     *
      * @return
      */
     ActionRegistry registerHandler( String pattern, HttpRequestHandler handler );
@@ -48,13 +50,14 @@ public interface ActionRegistry
      *
      * @param pattern
      * @param handler
+     *
      * @return
      */
     default ActionRegistry registerHandler( String pattern, HttpRequestHandlerBuilder handler )
     {
         return registerHandler( pattern, handler.build() );
     }
-    
+
     ActionRegistry addResponseInterceptorFirst( HttpResponseInterceptor itcp );
 
     ActionRegistry addResponseInterceptorLast( HttpResponseInterceptor itcp );
@@ -63,4 +66,5 @@ public interface ActionRegistry
 
     ActionRegistry addRequestInterceptorLast( HttpRequestInterceptor itcp );
 
+    ActionRegistry addContextListener( ContextListener cl );
 }

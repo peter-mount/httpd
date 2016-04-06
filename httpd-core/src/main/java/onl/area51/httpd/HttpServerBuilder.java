@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javax.net.ServerSocketFactory;
 import javax.net.ssl.SSLContext;
+import onl.area51.httpd.action.ContextListener;
 import org.apache.http.ConnectionClosedException;
 import org.apache.http.ConnectionReuseStrategy;
 import org.apache.http.ExceptionLogger;
@@ -178,6 +179,21 @@ public interface HttpServerBuilder
             {
                 b.addInterceptorLast( itcp );
                 return this;
+            }
+
+            @Override
+            public ActionRegistry addContextListener( ContextListener cl )
+            {
+                return addRequestInterceptorFirst( ( r, c ) -> {
+                    if( c.getAttribute( "request.unscoped" ) == null ) {
+                        cl.begin( r, c );
+                    }
+                } )
+                        .addResponseInterceptorLast( ( r, c ) -> {
+                            if( c.getAttribute( "request.unscoped" ) == null ) {
+                                cl.end( r, c );
+                            }
+                        } );
             }
 
         } );

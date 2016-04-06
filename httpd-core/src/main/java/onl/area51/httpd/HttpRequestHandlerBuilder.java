@@ -53,6 +53,15 @@ public interface HttpRequestHandlerBuilder
         return log( Logger.getGlobal(), Level.INFO );
     }
 
+    /**
+     * If invoked then CDI scopes (if present) are disabled. Use this for request handlers that handle static content as it will save memory
+     * <p>
+     * Usually used
+     *
+     * @return
+     */
+    HttpRequestHandlerBuilder unscoped();
+
     ChainBuilder method( String method );
 
     HttpRequestHandlerBuilder linkMethod( String method, String substitute );
@@ -487,10 +496,18 @@ public interface HttpRequestHandlerBuilder
     {
         return new HttpRequestHandlerBuilder()
         {
+            boolean unscoped;
             Map<String, Action> actions = new ConcurrentHashMap<>();
             Map<String, String> links = null;
             Logger logger;
             Level level;
+
+            @Override
+            public HttpRequestHandlerBuilder unscoped()
+            {
+                unscoped = true;
+                return this;
+            }
 
             @Override
             public HttpRequestHandlerBuilder log( Logger logger, Level level )
@@ -568,7 +585,9 @@ public interface HttpRequestHandlerBuilder
                 )
                         .apply( r );
 
-                Action action = logger == null || level == null ? router : new LogAction( logger, level, router );
+                Action action1 = logger == null || level == null ? router : new LogAction( logger, level, router );
+                
+                Action action = unscoped ? action1.compose( r -> r.setAttribute( "request.unscoped", true ) ) : action1;
 
                 return ( req, resp, ctx ) -> {
                     Request request = Request.create( req, resp, ctx );
