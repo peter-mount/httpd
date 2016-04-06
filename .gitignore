@@ -1,1 +1,3 @@
 /target/
+/httpd-core/target/
+/httpd-cdi/target/
