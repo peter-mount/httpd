@@ -78,6 +78,7 @@ public interface HttpServerBuilder
      *
      * @param pattern
      * @param handler
+     *
      * @return
      */
     HttpServerBuilder registerHandler( String pattern, HttpRequestHandler handler );
@@ -87,6 +88,7 @@ public interface HttpServerBuilder
      *
      * @param pattern
      * @param handler
+     *
      * @return
      */
     default HttpServerBuilder registerHandler( String pattern, HttpRequestHandlerBuilder handler )
@@ -149,6 +151,35 @@ public interface HttpServerBuilder
                 b.registerHandler( pattern, handler );
                 return this;
             }
+
+            @Override
+            public ActionRegistry addResponseInterceptorFirst( HttpResponseInterceptor itcp )
+            {
+                b.addInterceptorFirst( itcp );
+                return this;
+            }
+
+            @Override
+            public ActionRegistry addResponseInterceptorLast( HttpResponseInterceptor itcp )
+            {
+                b.addInterceptorLast( itcp );
+                return this;
+            }
+
+            @Override
+            public ActionRegistry addRequestInterceptorFirst( HttpRequestInterceptor itcp )
+            {
+                b.addInterceptorFirst( itcp );
+                return this;
+            }
+
+            @Override
+            public ActionRegistry addRequestInterceptorLast( HttpRequestInterceptor itcp )
+            {
+                b.addInterceptorLast( itcp );
+                return this;
+            }
+
         } );
         return this;
     }

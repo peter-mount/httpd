@@ -17,6 +17,8 @@ package onl.area51.httpd.service;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -33,6 +35,8 @@ import onl.area51.kernel.CommandArguments;
 import uk.trainwatch.util.config.Configuration;
 import uk.trainwatch.util.config.ConfigurationService;
 import onl.area51.httpd.action.Actions;
+import org.apache.http.HttpRequestInterceptor;
+import org.jboss.weld.context.bound.BoundRequestContext;
 
 @ApplicationScoped
 public class HttpService
@@ -94,7 +98,8 @@ public class HttpService
 
         try {
             server.start();
-        } catch( IOException ex ) {
+        }
+        catch( IOException ex ) {
             throw new UncheckedIOException( ex );
         }
 

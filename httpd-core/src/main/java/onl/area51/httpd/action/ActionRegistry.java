@@ -16,6 +16,9 @@
 package onl.area51.httpd.action;
 
 import onl.area51.httpd.HttpRequestHandlerBuilder;
+import onl.area51.httpd.HttpServerBuilder;
+import org.apache.http.HttpRequestInterceptor;
+import org.apache.http.HttpResponseInterceptor;
 import org.apache.http.protocol.HttpRequestHandler;
 
 /**
@@ -51,4 +54,13 @@ public interface ActionRegistry
     {
         return registerHandler( pattern, handler.build() );
     }
+    
+    ActionRegistry addResponseInterceptorFirst( HttpResponseInterceptor itcp );
+
+    ActionRegistry addResponseInterceptorLast( HttpResponseInterceptor itcp );
+
+    ActionRegistry addRequestInterceptorFirst( HttpRequestInterceptor itcp );
+
+    ActionRegistry addRequestInterceptorLast( HttpRequestInterceptor itcp );
+
 }
