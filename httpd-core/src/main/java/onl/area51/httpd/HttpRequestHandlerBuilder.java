@@ -29,6 +29,7 @@ import onl.area51.httpd.action.Action;
 import onl.area51.httpd.action.Actions;
 import onl.area51.httpd.action.HttpBiFunction;
 import onl.area51.httpd.action.HttpFunction;
+import onl.area51.httpd.action.HttpPredicate;
 import onl.area51.httpd.action.HttpSupplier;
 import onl.area51.httpd.action.Request;
 import org.apache.http.HttpEntity;
@@ -140,6 +141,62 @@ public interface HttpRequestHandlerBuilder
                     action.apply( r );
                 }
             } );
+        }
+
+        default ChainBuilder ifElse( HttpPredicate<Request> predicate, Action trueAction, Action falseAction )
+        {
+            return add( r -> {
+                if( predicate.test( r ) ) {
+                    trueAction.apply( r );
+                }
+                else {
+                    falseAction.apply( r );
+                }
+            } );
+        }
+
+        default ChainBuilder ifTrue( HttpPredicate<Request> predicate, Action action )
+        {
+            return add( r -> {
+                if( predicate.test( r ) ) {
+                    action.apply( r );
+                }
+            } );
+        }
+
+        default ChainBuilder ifFalse( HttpPredicate<Request> predicate, Action action )
+        {
+            return ifTrue( predicate.not(), action );
+        }
+
+        default ChainBuilder ifTrueSetAttribute( HttpPredicate<Request> predicate, String n, HttpFunction<Request, Object> f )
+        {
+            return ifTrue( predicate, r -> r.setAttribute( n, f.apply( r ) ) );
+        }
+
+        default ChainBuilder ifFalseSetAttribute( HttpPredicate<Request> predicate, String n, HttpFunction<Request, Object> f )
+        {
+            return ifFalse( predicate, r -> r.setAttribute( n, f.apply( r ) ) );
+        }
+
+        default ChainBuilder ifTrueSendError( HttpPredicate<Request> predicate, int c, String m )
+        {
+            return ifTrue( predicate, r -> Actions.sendError( r, c, m ) );
+        }
+
+        default ChainBuilder ifFalseSendError( HttpPredicate<Request> predicate, int c, String m )
+        {
+            return ifFalse( predicate, r -> Actions.sendError( r, c, m ) );
+        }
+
+        default ChainBuilder ifAttributeTrueSetAttribute( String n, String n2, HttpFunction<Request, Object> function )
+        {
+            return ifTrue( HttpPredicate.attributeTrue( n ), r -> r.setAttribute( n2, function.apply( r ) ) );
+        }
+
+        default ChainBuilder ifAttributeFalseSetAttribute( String n, String n2, HttpFunction<Request, Object> function )
+        {
+            return ifFalse( HttpPredicate.attributeTrue( n ), r -> r.setAttribute( n2, function.apply( r ) ) );
         }
 
         /**
@@ -586,7 +643,7 @@ public interface HttpRequestHandlerBuilder
                         .apply( r );
 
                 Action action1 = logger == null || level == null ? router : new LogAction( logger, level, router );
-                
+
                 Action action = unscoped ? action1.compose( r -> r.setAttribute( "request.unscoped", true ) ) : action1;
 
                 return ( req, resp, ctx ) -> {
