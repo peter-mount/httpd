@@ -18,8 +18,6 @@ package onl.area51.httpd.action;
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.http.HttpException;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
 
 /**
  *
@@ -49,9 +47,17 @@ public interface Action
         return before.andThen( this );
     }
 
+    /**
+     *
+     * @param req
+     *
+     * @return
+     *
+     * @deprecated use {@link Actions#isOk(onl.area51.httpd.action.Request) }
+     */
+    @Deprecated
     static boolean isOk( Request req )
     {
-        HttpResponse resp = req.getHttpResponse();
-        return (resp.getStatusLine() == null || resp.getStatusLine().getStatusCode() == HttpStatus.SC_OK) && resp.getEntity() == null;
+        return Actions.isOk( req );
     }
 }

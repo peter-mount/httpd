@@ -32,9 +32,12 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.protocol.HttpContext;
@@ -84,14 +87,81 @@ public interface Request
         return s == null ? 0 : Integer.parseInt( s );
     }
 
+    /**
+     * Return the request attribute n
+     *
+     * @param <T>
+     * @param n   Attribute name
+     *
+     * @return value or null if not set
+     */
     default <T> T getAttribute( String n )
     {
         return (T) getHttpContext().getAttribute( n );
     }
 
+    /**
+     * Return the request attribute n. If not set then use a mapping function to set it.
+     *
+     * @param <T>
+     * @param n   Attribute name
+     * @param f   function to map attribute to value. This may return null for no mapping.
+     *
+     * @return value or null if not set
+     *
+     * @throws org.apache.http.HttpException
+     * @throws java.io.IOException
+     */
+    default <T> T getAttribute( String n, HttpFunction<String, T> f )
+            throws HttpException,
+                   IOException
+    {
+        T v = getAttribute( n );
+        if( v == null ) {
+            v = f.apply( n );
+            setAttribute( n, v );
+        }
+        return v;
+    }
+
+    /**
+     * Return the request attribute n. If not set then use a Supplier to get the default value and set that attribute to that value.
+     *
+     * @param <T>
+     * @param n   Attribute name
+     * @param s   Supplier. This may return null to not set an attribute
+     *
+     * @return value or null if not set
+     *
+     * @throws org.apache.http.HttpException
+     * @throws java.io.IOException
+     */
+    default <T> T getAttribute( String n, HttpSupplier<T> s )
+            throws HttpException,
+                   IOException
+    {
+        T v = getAttribute( n );
+        if( v == null ) {
+            v = s.get();
+            setAttribute( n, v );
+        }
+        return v;
+    }
+
+    default Request removeAttribute( String n )
+    {
+        getHttpContext().removeAttribute( n );
+        return this;
+    }
+
     default Request setAttribute( String n, Object v )
     {
-        getHttpContext().setAttribute( n, v );
+        if( v == null ) {
+            getHttpContext().removeAttribute( n );
+        }
+        else {
+            getHttpContext().setAttribute( n, v );
+        }
         return this;
     }
 
@@ -426,5 +496,68 @@ last-modified:Tue, 29 Mar 2016 12:27:11 GMT
             }
 
         };
+    }
+
+    /**
+     * Return's the path as a String array.
+     * <p>
+     * This will be the request's URI split at every '/'. The first element will always be blank as the uri will start with / so the uri "/test/ldb/MDE" will
+     * return the array ["","test","ldb","MDE"].
+     * <p>
+     * This is commonly used to extract elements from a URI
+     *
+     * @return
+     *
+     * @throws IOException
+     */
+    default String[] getPath()
+            throws IOException
+    {
+        // Implementation note: we cache the value in the request
+        String path[] = getAttribute( "request.path" );
+        if( path == null ) {
+            path = getURI().getPath().split( "/" );
+            setAttribute( "request.path", path );
+        }
+        return path;
+    }
+
+    /**
+     * Return a path element.
+     * <p>
+     * This will return the numbered path element. Element 0 will always be "" as the url always starts with / so for the uri "/test/ldb/MDE":
+     * <ol>
+     * <li>{@code getPath(0)} always returns ""</li~>
+     * <li>{@code getPath(1)} returns "test"</li~>
+     * <li>{@code getPath(2)} returns "ldb"</li~>
+     * <li>{@code getPath(3)} returns "MDE"</li~>
+     * <li>{@code getPath(4)} returns null</li~>
+     * </ol>
+     *
+     * @param idx element to return
+     *
+     * @return path element or null
+     *
+     * @throws IOException
+     */
+    default String getPath( int idx )
+            throws IOException
+    {
+        String path[] = getPath();
+        return path == null || path.length <= idx ? null : path[idx];
+    }
+
+    /**
+     * Returns the path length.
+     *
+     * @return path length.
+     *
+     * @throws IOException
+     */
+    default int getPathLength()
+            throws IOException
+    {
+        String path[] = getPath();
+        return path == null ? 0 : path.length;
     }
 }

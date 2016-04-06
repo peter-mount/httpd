@@ -20,13 +20,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.http.HttpStatus;
 import org.apache.http.protocol.HttpRequestHandler;
 import onl.area51.httpd.action.Action;
 import onl.area51.httpd.action.Actions;
+import onl.area51.httpd.action.HttpBiFunction;
+import onl.area51.httpd.action.HttpFunction;
+import onl.area51.httpd.action.HttpSupplier;
 import onl.area51.httpd.action.Request;
+import org.apache.http.HttpEntity;
 
 /**
  * Build's a {@link HttpRequestHandler} from one or more {@link HttpAction}'s associated with a method
@@ -66,6 +71,13 @@ public interface HttpRequestHandlerBuilder
          */
         ChainBuilder add( Action action );
 
+        /**
+         * Apply an action if a Response is present
+         *
+         * @param action
+         *
+         * @return
+         */
         default ChainBuilder ifResponsePresent( Action action )
         {
             return add( r -> {
@@ -75,6 +87,43 @@ public interface HttpRequestHandlerBuilder
             } );
         }
 
+        default ChainBuilder ifResponseAbsent( Action action )
+        {
+            return add( r -> {
+                if( !r.isResponsePresent() ) {
+                    action.apply( r );
+                }
+            } );
+        }
+
+        default ChainBuilder setAttribute( String n, Object v )
+        {
+            return add( r -> r.setAttribute( n, v ) );
+        }
+
+        default ChainBuilder setAttribute( String n, HttpSupplier<Object> s )
+        {
+            return add( r -> r.setAttribute( n, s.get() ) );
+        }
+
+        default ChainBuilder setAttribute( String n, HttpFunction<Request, Object> f )
+        {
+            return add( r -> r.setAttribute( n, f.apply( r ) ) );
+        }
+
+        default ChainBuilder setAttribute( String n, HttpBiFunction<String, Request, Object> f )
+        {
+            return add( r -> r.setAttribute( n, f.apply( n, r ) ) );
+        }
+
+        /**
+         * Apply an action if a request attribute is set
+         *
+         * @param n
+         * @param action
+         *
+         * @return
+         */
         default ChainBuilder ifAttributePresent( String n, Action action )
         {
             return add( r -> {
@@ -85,6 +134,158 @@ public interface HttpRequestHandlerBuilder
         }
 
         /**
+         * If a request attribute is set then perform some action and store it's result as another attribute.
+         * <p>
+         * This is the same as {@code ifAttributePresent( n, r -> r.setAttribute( n2, action.apply( r ) ) )}
+         *
+         * @param n        Attribute to expect to be set
+         * @param n2       Attribute to set if the action is invoked
+         * @param function Action to invoke if n exists. It's result is set to attribute n2
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributePresentSetAttribute( String n, String n2, HttpFunction<Request, Object> function )
+        {
+            return ifAttributePresent( n, r -> r.setAttribute( n2, function.apply( r ) ) );
+        }
+
+        /**
+         * If a request attribute is set then perform some action and store it's result as another attribute.
+         * <p>
+         * The function accepts two parameters, request and the attibute n's value. It's result will be set to n2. If null then n2 is unset.
+         *
+         * @param n        Attribute to expect to be set
+         * @param n2       Attribute to set if the action is invoked
+         * @param function Action to invoke if n exists. It's result is set to attribute n2
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributePresentSetAttribute( String n, String n2, HttpBiFunction<Request, Object, Object> function )
+        {
+            return ifAttributePresent( n, r -> r.setAttribute( n2, function.apply( r, r.getAttribute( n ) ) ) );
+        }
+
+        /**
+         * If a request attribute is set then perform some action and store it's result as another attribute.
+         * <p>
+         * This is the same as {@code ifAttributePresent( n, r -> r.setAttribute( n2, action.apply( r ) ) )}
+         *
+         * @param n        Attribute to expect to be set
+         * @param n2       Attribute to set if the action is invoked
+         * @param function Action to invoke if n exists. It's result is set to attribute n2
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributePresentSetAttribute( String n, String n2, HttpSupplier<Object> function )
+        {
+            return ifAttributePresent( n, r -> r.setAttribute( n2, function.get() ) );
+        }
+
+        /**
+         * Apply an action if a request attribute is absent
+         *
+         * @param n
+         * @param action
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsent( String n, Action action )
+        {
+            return add( r -> {
+                if( !r.isAttributePresent( n ) ) {
+                    action.apply( r );
+                }
+            } );
+        }
+
+        /**
+         * If a request attribute is absent then perform some action and store it's result as another attribute.
+         * <p>
+         * This is the same as {@code ifAttributeAbsent( n, r -> r.setAttribute( n2, action.apply( r ) ) )}
+         *
+         * @param n        Attribute to expect to be set
+         * @param n2       Attribute to set if the action is invoked
+         * @param function Action to invoke if n exists. It's result is set to attribute n2
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsentSetAttribute( String n, String n2, HttpFunction<Request, Object> function )
+        {
+            return ifAttributeAbsent( n, r -> r.setAttribute( n2, function.apply( r ) ) );
+        }
+
+        /**
+         * If a request attribute is absent then perform some action and store it's result as another attribute.
+         * <p>
+         * This is the same as {@code ifAttributeAbsent( n, r -> r.setAttribute( n2, action.apply( r ) ) )}
+         *
+         * @param n        Attribute to expect to be set
+         * @param n2       Attribute to set if the action is invoked
+         * @param supplier Action to invoke if n exists. It's result is set to attribute n2
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsentSetAttribute( String n, String n2, HttpSupplier< Object> supplier )
+        {
+            return ifAttributeAbsent( n, r -> r.setAttribute( n2, supplier.get() ) );
+        }
+
+        /**
+         * If a request attribute is absent then perform some action and store it's result in that attribute.
+         * <p>
+         * This is the same as {@code ifAttributeAbsent( n, n, action )}
+         *
+         * @param n        Attribute to expect to be set
+         * @param function Action to invoke if n exists. It's result is set to attribute n
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsentSetAttribute( String n, HttpFunction<Request, Object> function )
+        {
+            return ChainBuilder.this.ifAttributeAbsentSetAttribute( n, n, function );
+        }
+
+        /**
+         * If a request attribute is absent then perform some action and store it's result in that attribute.
+         * <p>
+         * This is the same as {@code ifAttributeAbsent( n, n, action )}
+         *
+         * @param n        Attribute to expect to be set
+         * @param supplier Action to invoke if n exists. It's result is set to attribute n
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsentSetAttribute( String n, HttpSupplier<Object> supplier )
+        {
+            return ChainBuilder.this.ifAttributeAbsentSetAttribute( n, n, supplier );
+        }
+
+        /**
+         * Set a request attribute to the value of a request parameter. If the parameter is not set then the attribute will not be set.
+         *
+         * @param p request parameter and attribute name
+         *
+         * @return
+         */
+        default ChainBuilder setAttributeFromParameter( String p )
+        {
+            return setAttributeFromParameter( p, p );
+        }
+
+        /**
+         * Set a request attribute to the value of a request parameter. If the parameter is not set then the attribute will not be set.
+         *
+         * @param a request attribute to set
+         * @param p request parameter to retrieve
+         *
+         * @return
+         */
+        default ChainBuilder setAttributeFromParameter( String a, String p )
+        {
+            return add( r -> r.setAttribute( a, r.getParam( p ) ) );
+        }
+
+        /**
          * Complete the chain.
          * <p>
          * Note, if a chain has already been created then this will append to that chain.
@@ -92,6 +293,108 @@ public interface HttpRequestHandlerBuilder
          * @return
          */
         HttpRequestHandlerBuilder end();
+
+        /**
+         * Send an OK response
+         *
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder sendOk( HttpSupplier<? extends HttpEntity> supplier )
+        {
+            return add( r -> Actions.sendOk( r, supplier.get() ) );
+        }
+
+        /**
+         * Send an OK response
+         *
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder sendOk( Supplier<? extends HttpEntity> supplier )
+        {
+            return add( r -> Actions.sendOk( r, supplier.get() ) );
+        }
+
+        /**
+         * Send an ok response if an attribute is present
+         *
+         * @param n        Attribute name
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributePresentSendOk( String n, HttpSupplier<? extends HttpEntity> supplier )
+        {
+            return ifAttributePresent( n, r -> Actions.sendOk( r, supplier.get() ) );
+        }
+
+        /**
+         * Send an ok response if an attribute is present
+         *
+         * @param n        Attribute name
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributePresentSendOk( String n, HttpFunction<Request, ? extends HttpEntity> supplier )
+        {
+            return ifAttributePresent( n, r -> Actions.sendOk( r, supplier.apply( r ) ) );
+        }
+
+        /**
+         * Send an ok response if an attribute is present
+         *
+         * @param n        Attribute name
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributePresentSendOk( String n, HttpBiFunction<String, Request, ? extends HttpEntity> supplier )
+        {
+            return ifAttributePresent( n, r -> Actions.sendOk( r, supplier.apply( n, r ) ) );
+        }
+
+        /**
+         * Send an ok response if an attribute is absent
+         *
+         * @param n        Attribute name
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsentSendOk( String n, HttpSupplier<? extends HttpEntity> supplier )
+        {
+            return ifAttributeAbsent( n, r -> Actions.sendOk( r, supplier.get() ) );
+        }
+
+        /**
+         * Send an ok response if an attribute is absent
+         *
+         * @param n        Attribute name
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsentSendOk( String n, HttpFunction<Request, ? extends HttpEntity> supplier )
+        {
+            return ifAttributeAbsent( n, r -> Actions.sendOk( r, supplier.apply( r ) ) );
+        }
+
+        /**
+         * Send an ok response if an attribute is absent
+         *
+         * @param n        Attribute name
+         * @param supplier Supplier of the entity
+         *
+         * @return
+         */
+        default ChainBuilder ifAttributeAbsentSendOk( String n, HttpBiFunction<String, Request, ? extends HttpEntity> supplier )
+        {
+            return ifAttributeAbsent( n, r -> Actions.sendOk( r, supplier.apply( n, r ) ) );
+        }
 
         /**
          * Respond with an error
@@ -139,9 +442,9 @@ public interface HttpRequestHandlerBuilder
          *
          * @return
          */
-        default HttpRequestHandlerBuilder errorIfAttributeAbsent( String n, int code )
+        default ChainBuilder ifAttributeAbsentSendError( String n, int code )
         {
-            return errorIfAttributeAbsent( n, code, String.valueOf( code ) );
+            return ChainBuilder.this.ifAttributeAbsentSendError( n, code, String.valueOf( code ) );
         }
 
         /**
@@ -152,13 +455,13 @@ public interface HttpRequestHandlerBuilder
          *
          * @return
          */
-        default HttpRequestHandlerBuilder errorIfAttributeAbsent( String n, int code, String message )
+        default ChainBuilder ifAttributeAbsentSendError( String n, int code, String message )
         {
             return add( r -> {
                 if( !r.isAttributePresent( n ) ) {
                     Actions.sendError( r, code, message );
                 }
-            } ).end();
+            } );
         }
 
         /**
@@ -170,13 +473,13 @@ public interface HttpRequestHandlerBuilder
          *
          * @return
          */
-        default HttpRequestHandlerBuilder errorIfAttributeAbsent( String n, int code, String fmt, Object... args )
+        default ChainBuilder ifAttributeAbsentSendError( String n, int code, String fmt, Object... args )
         {
             return add( r -> {
                 if( !r.isAttributePresent( n ) ) {
                     Actions.sendError( r, code, fmt, args );
                 }
-            } ).end();
+            } );
         }
     }
 

@@ -22,6 +22,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import onl.area51.httpd.action.Request;
+import org.apache.http.HttpEntity;
 import org.apache.http.entity.AbstractHttpEntity;
 import org.apache.http.entity.ContentType;
 import org.apache.http.util.Args;
@@ -37,6 +39,16 @@ public class PathEntity
 {
 
     protected final Path file;
+
+    public static HttpEntity create( String n, Request r )
+    {
+        return new PathEntity( r.getAttribute( n ) );
+    }
+
+    public static HttpEntity createSizeOnly( String n, Request r )
+    {
+        return new PathEntity.SizeOnly( r.getAttribute( n ) );
+    }
 
     @SuppressWarnings("OverridableMethodCallInConstructor")
     public PathEntity( final Path file, final ContentType contentType )

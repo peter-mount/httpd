@@ -113,9 +113,14 @@ public interface Actions
      */
     static void sendError( Request req, int sc, String message )
     {
-        HttpResponse response = req.getHttpResponse();
-        response.setStatusCode( sc );
-        response.setEntity( new StringEntity( "<html><body><div style=\"align:center;\"><img src=\"/." + sc + ".png\"/><p>" + message + "</p></div></body></html>", ContentType.TEXT_HTML ) );
+        req.getHttpResponse().setEntity( errorEntity( req, sc, message ) );
+    }
+
+    static HttpEntity errorEntity( Request req, int sc, String message )
+    {
+        req.getHttpResponse().setStatusCode( sc );
+        return new StringEntity( "<html><body><div style=\"align:center;\"><img src=\"/." + sc + ".png\"/><p>" + message + "</p></div></body></html>",
+                                 ContentType.TEXT_HTML );
     }
 
     /**
@@ -145,6 +150,42 @@ public interface Actions
     }
 
     /**
+     * Send a 302 Moved temporary redirect
+     *
+     * @param req Request
+     * @param uri Uri to redirect to
+     */
+    static void sendRedirect( Request req, String uri )
+    {
+        sendRedirect( req, HttpStatus.SC_MOVED_TEMPORARILY, uri );
+    }
+
+    /**
+     * Send a redirect
+     *
+     * @param req  Request
+     * @param code HttpStatus, one of
+     *             {@link HttpStatus#SC_MOVED_PERMANENTLY}, {@link HttpStatus#SC_MOVED_TEMPORARILY}, {@link HttpStatus#SC_SEE_OTHER}, {@link HttpStatus#SC_USE_PROXY}
+     *             or {@link HttpStatus#SC_TEMPORARY_REDIRECT}
+     * @param uri
+     */
+    static void sendRedirect( Request req, int code, String uri )
+    {
+        HttpResponse response = req.getHttpResponse();
+        response.setStatusCode( code );
+        response.addHeader( "Location", uri );
+        response.setEntity( new StringEntity( "<html><head><title>Moved</title></head><body><h1>Moved</h1><p>This page has moved to <a href=\""
+                                              + uri + "\">" + uri + "</a>.</p></body></html>",
+                                              ContentType.TEXT_HTML ) );
+    }
+
+    static boolean isOk( Request req )
+    {
+        HttpResponse resp = req.getHttpResponse();
+        return (resp.getStatusLine() == null || resp.getStatusLine().getStatusCode() == HttpStatus.SC_OK) && resp.getEntity() == null;
+    }
+
+    /**
      * An action that does nothing.
      *
      * @return
@@ -159,6 +200,7 @@ public interface Actions
      * Exposes resources under META-INF/resources like you can in servlet web-fragments.
      *
      * @param clazz
+     *
      * @return
      */
     static Action resourceAction( Class<?> clazz )
@@ -199,6 +241,7 @@ public interface Actions
      * @param clazz Class from which to perform the search
      * @param r     Request
      * @param uri   URI to retrieve
+     *
      * @throws java.io.IOException
      */
     static void renderResource( Class<?> clazz, Request r, URI uri )
