@@ -189,6 +189,16 @@ public interface HttpRequestHandlerBuilder
             return ifFalse( predicate, r -> Actions.sendError( r, c, m ) );
         }
 
+        default ChainBuilder ifAttributeTrue( String n, Action action )
+        {
+            return ifTrue( HttpPredicate.attributeTrue( n ), action );
+        }
+
+        default ChainBuilder ifAttributeFalse( String n, Action action )
+        {
+            return ifFalse( HttpPredicate.attributeTrue( n ), action );
+        }
+
         default ChainBuilder ifAttributeTrueSetAttribute( String n, String n2, HttpFunction<Request, Object> function )
         {
             return ifTrue( HttpPredicate.attributeTrue( n ), r -> r.setAttribute( n2, function.apply( r ) ) );
