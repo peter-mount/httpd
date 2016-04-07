@@ -32,8 +32,6 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.http.HttpEntity;
@@ -317,6 +315,28 @@ last-modified:Tue, 29 Mar 2016 12:27:11 GMT
     default Request maxAge( long v, ChronoUnit unit )
     {
         return maxAge( Duration.of( v, unit ) );
+    }
+
+    /**
+     * Allow access from any host
+     *
+     * @return
+     */
+    default Request accessControlAllowOriginAny()
+    {
+        return accessControlAllowOrigin( "*" );
+    }
+
+    /**
+     * Allow access from specified host, or any if "*"
+     *
+     * @param v
+     *
+     * @return
+     */
+    default Request accessControlAllowOrigin( String v )
+    {
+        return addHeader( "Access-Control-Allow-Origin", v );
     }
 
     static Request create( HttpRequest req, HttpResponse resp, HttpContext ctx )
