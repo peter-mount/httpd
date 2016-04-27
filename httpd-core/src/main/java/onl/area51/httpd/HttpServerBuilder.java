@@ -18,6 +18,7 @@ package onl.area51.httpd;
 import onl.area51.httpd.action.ActionRegistry;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -360,7 +361,7 @@ public interface HttpServerBuilder
             public HttpServerBuilder setExceptionLogger( ExceptionLogger exceptionLogger, boolean filter )
             {
                 sb.setExceptionLogger( filter ? ex -> {
-                    if( !(ex instanceof SocketTimeoutException) && !(ex instanceof ConnectionClosedException) ) {
+                    if( !(ex instanceof SocketTimeoutException) && !(ex instanceof ConnectionClosedException) && !(ex instanceof SocketException) ) {
                         exceptionLogger.log( ex );
                     }
                 } : exceptionLogger );
