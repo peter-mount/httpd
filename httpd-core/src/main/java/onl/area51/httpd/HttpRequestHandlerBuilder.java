@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -32,6 +33,7 @@ import onl.area51.httpd.action.HttpFunction;
 import onl.area51.httpd.action.HttpPredicate;
 import onl.area51.httpd.action.HttpSupplier;
 import onl.area51.httpd.action.Request;
+import onl.area51.httpd.filter.RequestPredicate;
 import org.apache.http.HttpEntity;
 
 /**
@@ -63,6 +65,38 @@ public interface HttpRequestHandlerBuilder
      */
     HttpRequestHandlerBuilder unscoped();
 
+    /**
+     * Filter requests by a {@link RequestPredicate} and only allow the request to pass if the predicate returns true.
+     * <p>
+     * This method affects all requests regardless of the method. To filter by method then use {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
+     * }.
+     * <p>
+     * If you use both this method and {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then this filter is applied first then that one.
+     *
+     * @param predicate
+     *
+     * @return this instance
+     *
+     * @see ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
+     */
+    HttpRequestHandlerBuilder filterRequest( RequestPredicate predicate );
+
+    /**
+     * Filter requests by a {@link RequestPredicate} and only allow the request to pass if the predicate returns true.
+     * <p>
+     * This method affects all requests regardless of the method. To filter by method then use {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
+     * }.
+     * <p>
+     * If you use both this method and {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then this filter is applied first then that one.
+     *
+     * @param predicate
+     *
+     * @return this instance
+     *
+     * @see ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
+     */
+    HttpRequestHandlerBuilder filter( Predicate<Request> predicate );
+
     ChainBuilder method( String method );
 
     HttpRequestHandlerBuilder linkMethod( String method, String substitute );
@@ -80,6 +114,38 @@ public interface HttpRequestHandlerBuilder
          * @return
          */
         ChainBuilder add( Action action );
+
+        /**
+         * Filter requests by a {@link RequestPredicate} and only allow the request to pass if the predicate returns true.
+         * <p>
+         * Unlike {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } this only affects the method being built.
+         * <p>
+         * If you use both this method and {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then that filter is applied first
+         * then this one.
+         *
+         * @param predicate
+         *
+         * @return
+         *
+         * @see HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
+         */
+        ChainBuilder filterRequest( RequestPredicate predicate );
+
+        /**
+         * Filter requests by a {@link RequestPredicate} and only allow the request to pass if the predicate returns true.
+         * <p>
+         * Unlike {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } this only affects the method being built.
+         * <p>
+         * If you use both this method and {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then that filter is applied first
+         * then this one.
+         *
+         * @param predicate
+         *
+         * @return
+         *
+         * @see HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
+         */
+        ChainBuilder filter( Predicate<Request> predicate );
 
         /**
          * Apply an action if a Response is present
@@ -514,6 +580,7 @@ public interface HttpRequestHandlerBuilder
         /**
          * Respond with an error
          *
+         * @param n
          * @param code HTTP status code
          *
          * @return
@@ -526,6 +593,7 @@ public interface HttpRequestHandlerBuilder
         /**
          * Respond with an error
          *
+         * @param n
          * @param code    HTTP status code
          * @param message Message
          *
@@ -543,6 +611,7 @@ public interface HttpRequestHandlerBuilder
         /**
          * Respond with an error
          *
+         * @param n
          * @param code HTTP status code
          * @param fmt  Format
          * @param args arguments
@@ -563,11 +632,13 @@ public interface HttpRequestHandlerBuilder
     {
         return new HttpRequestHandlerBuilder()
         {
-            boolean unscoped;
-            Map<String, Action> actions = new ConcurrentHashMap<>();
-            Map<String, String> links = null;
-            Logger logger;
-            Level level;
+            private boolean unscoped;
+            private final Map<String, Action> actions = new ConcurrentHashMap<>();
+            private Map<String, String> links = null;
+            private Logger logger;
+            private Level level;
+            private RequestPredicate requestPredicate;
+            private Predicate<Request> predicate;
 
             @Override
             public HttpRequestHandlerBuilder unscoped()
@@ -591,6 +662,8 @@ public interface HttpRequestHandlerBuilder
                 ChainBuilder c = new ChainBuilder()
                 {
                     private Action action;
+                    private RequestPredicate requestPredicate;
+                    private Predicate<Request> predicate;
 
                     @Override
                     public ChainBuilder add( Action action )
@@ -601,16 +674,44 @@ public interface HttpRequestHandlerBuilder
                     }
 
                     @Override
+                    public ChainBuilder filterRequest( RequestPredicate predicate )
+                    {
+                        requestPredicate = RequestPredicate.and( requestPredicate, predicate );
+                        return this;
+                    }
+
+                    @Override
+                    public ChainBuilder filter( Predicate<Request> predicate )
+                    {
+                        this.predicate = this.predicate == null ? predicate : this.predicate.and( predicate );
+                        return this;
+                    }
+
+                    @Override
                     public HttpRequestHandlerBuilder end()
                     {
                         Objects.requireNonNull( action, "No action defined for " + method );
 
-                        actions.merge( method.toUpperCase( Locale.ROOT ), action, Action::andThen );
+                        actions.merge( method.toUpperCase( Locale.ROOT ), action.filterRequest( requestPredicate ).filter( predicate ), Action::andThen );
                         return b;
                     }
                 };
 
                 return c;
+            }
+
+            @Override
+            public HttpRequestHandlerBuilder filterRequest( RequestPredicate predicate )
+            {
+                requestPredicate = RequestPredicate.and( requestPredicate, predicate );
+                return this;
+            }
+
+            @Override
+            public HttpRequestHandlerBuilder filter( Predicate<Request> predicate )
+            {
+                this.predicate = this.predicate == null ? predicate : this.predicate.and( predicate );
+                return this;
             }
 
             @Override
@@ -646,20 +747,21 @@ public interface HttpRequestHandlerBuilder
                     actions.put( "HEAD", actions.get( "GET" ) );
                 }
 
-                Action router = r -> actions.getOrDefault(
-                        r.getHttpRequest().getRequestLine().getMethod().toUpperCase( Locale.ROOT ),
-                        r1 -> Actions.sendError( r1, HttpStatus.SC_METHOD_NOT_ALLOWED, "Method not allowed" )
-                )
-                        .apply( r );
-
-                Action action1 = logger == null || level == null ? router : new LogAction( logger, level, router );
-
-                Action action = unscoped ? action1.compose( r -> r.setAttribute( "request.unscoped", true ) ) : action1;
+                Action router = Action.filterRequest(
+                        r -> actions.getOrDefault(
+                                r.getHttpRequest().getRequestLine().getMethod().toUpperCase( Locale.ROOT ),
+                                r1 -> Actions.sendError( r1, HttpStatus.SC_METHOD_NOT_ALLOWED, "Method not allowed" )
+                        ).apply( r ), requestPredicate )
+                        .filter( predicate )
+                        // unscoped then set attribute before the action
+                        .composeIf( unscoped, () -> r -> r.setAttribute( "request.unscoped", true ) )
+                        // Wrap with the logger
+                        .wrapif( logger != null && level != null, a -> new LogAction( logger, level, a ) );
 
                 return ( req, resp, ctx ) -> {
                     Request request = Request.create( req, resp, ctx );
                     try {
-                        action.apply( request );
+                        router.apply( request );
                     }
                     finally {
                         if( request.isResponsePresent() ) {

@@ -338,7 +338,7 @@ last-modified:Tue, 29 Mar 2016 12:27:11 GMT
     {
         return addHeader( "Access-Control-Allow-Origin", v );
     }
-
+    
     static Request create( HttpRequest req, HttpResponse resp, HttpContext ctx )
     {
         return new Request()

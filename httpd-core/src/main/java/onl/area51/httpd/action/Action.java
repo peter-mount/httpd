@@ -17,6 +17,10 @@ package onl.area51.httpd.action;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+import onl.area51.httpd.filter.RequestPredicate;
 import org.apache.http.HttpException;
 
 /**
@@ -41,10 +45,68 @@ public interface Action
         };
     }
 
+    static Action and( Action a, Action b )
+    {
+        return a == null ? b : b == null ? a : a.andThen( b );
+    }
+
+    default Action andThenIf( boolean andThen, Supplier<Action> after )
+    {
+        return andThen ? andThen( after.get() ) : this;
+    }
+
     default Action compose( Action before )
     {
         Objects.requireNonNull( before );
         return before.andThen( this );
+    }
+
+    default Action composeIf( boolean compose, Supplier<Action> before )
+    {
+        return compose ? compose( before.get() ) : this;
+    }
+
+    default Action wrap( Action before, Action after )
+    {
+        return compose( before ).andThen( after );
+    }
+
+    default Action wrapif( boolean wrap, Supplier<Action> before, Supplier<Action> after )
+    {
+        return wrap ? wrap( before.get(), after.get() ) : this;
+    }
+
+    default Action wrapif( boolean wrap, UnaryOperator<Action> mapper )
+    {
+        return wrap ? mapper.apply( this ) : this;
+    }
+
+    default Action filterRequest( RequestPredicate p )
+    {
+        return p == null ? this : r -> {
+            if( p.test( r ) ) {
+                apply( r );
+            }
+        };
+    }
+
+    static Action filterRequest( Action a, RequestPredicate p )
+    {
+        return a.filterRequest( p );
+    }
+
+    default Action filter( Predicate<Request> p )
+    {
+        return p == null ? this : r -> {
+            if( p.test( r ) ) {
+                apply( r );
+            }
+        };
+    }
+
+    static Action filter( Action a, Predicate<Request> p )
+    {
+        return a.filter( p );
     }
 
     /**
