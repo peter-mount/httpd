@@ -21,6 +21,7 @@
       <module>httpd-buttons</module>
       <module>httpd-core</module>
       <module>httpd-cdi</module>
+      <module>httpd-rest</module>
     </modules>
 
 </project>
