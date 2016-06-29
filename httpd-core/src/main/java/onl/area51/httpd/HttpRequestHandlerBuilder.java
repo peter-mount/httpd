@@ -15,6 +15,7 @@
  */
 package onl.area51.httpd;
 
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -35,6 +36,7 @@ import onl.area51.httpd.action.HttpSupplier;
 import onl.area51.httpd.action.Request;
 import onl.area51.httpd.filter.RequestPredicate;
 import org.apache.http.HttpEntity;
+import org.apache.http.entity.StringEntity;
 
 /**
  * Build's a {@link HttpRequestHandler} from one or more {@link HttpAction}'s associated with a method
@@ -57,7 +59,8 @@ public interface HttpRequestHandlerBuilder
     }
 
     /**
-     * If invoked then CDI scopes (if present) are disabled. Use this for request handlers that handle static content as it will save memory
+     * If invoked then CDI scopes (if present) are disabled. Use this for request handlers that handle static content as it will
+     * save memory
      * <p>
      * Usually used
      *
@@ -71,7 +74,8 @@ public interface HttpRequestHandlerBuilder
      * This method affects all requests regardless of the method. To filter by method then use {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
      * }.
      * <p>
-     * If you use both this method and {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then this filter is applied first then that one.
+     * If you use both this method and {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then this filter
+     * is applied first then that one.
      *
      * @param predicate
      *
@@ -87,7 +91,8 @@ public interface HttpRequestHandlerBuilder
      * This method affects all requests regardless of the method. To filter by method then use {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate)
      * }.
      * <p>
-     * If you use both this method and {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then this filter is applied first then that one.
+     * If you use both this method and {@link ChainBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then this filter
+     * is applied first then that one.
      *
      * @param predicate
      *
@@ -118,10 +123,11 @@ public interface HttpRequestHandlerBuilder
         /**
          * Filter requests by a {@link RequestPredicate} and only allow the request to pass if the predicate returns true.
          * <p>
-         * Unlike {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } this only affects the method being built.
+         * Unlike {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } this only affects the
+         * method being built.
          * <p>
-         * If you use both this method and {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then that filter is applied first
-         * then this one.
+         * If you use both this method and {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) }
+         * then that filter is applied first then this one.
          *
          * @param predicate
          *
@@ -134,10 +140,11 @@ public interface HttpRequestHandlerBuilder
         /**
          * Filter requests by a {@link RequestPredicate} and only allow the request to pass if the predicate returns true.
          * <p>
-         * Unlike {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } this only affects the method being built.
+         * Unlike {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } this only affects the
+         * method being built.
          * <p>
-         * If you use both this method and {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) } then that filter is applied first
-         * then this one.
+         * If you use both this method and {@link HttpRequestHandlerBuilder#filter(onl.area51.httpd.filter.RequestPredicate) }
+         * then that filter is applied first then this one.
          *
          * @param predicate
          *
@@ -294,7 +301,8 @@ public interface HttpRequestHandlerBuilder
         /**
          * If a request attribute is set then perform some action and store it's result as another attribute.
          * <p>
-         * The function accepts two parameters, request and the attibute n's value. It's result will be set to n2. If null then n2 is unset.
+         * The function accepts two parameters, request and the attibute n's value. It's result will be set to n2. If null then
+         * n2 is unset.
          *
          * @param n        Attribute to expect to be set
          * @param n2       Attribute to set if the action is invoked
@@ -302,7 +310,8 @@ public interface HttpRequestHandlerBuilder
          *
          * @return
          */
-        default ChainBuilder ifAttributePresentSetAttribute( String n, String n2, HttpBiFunction<Request, Object, Object> function )
+        default ChainBuilder ifAttributePresentSetAttribute( String n, String n2,
+                                                             HttpBiFunction<Request, Object, Object> function )
         {
             return ifAttributePresent( n, r -> r.setAttribute( n2, function.apply( r, r.getAttribute( n ) ) ) );
         }
@@ -403,7 +412,8 @@ public interface HttpRequestHandlerBuilder
         }
 
         /**
-         * Set a request attribute to the value of a request parameter. If the parameter is not set then the attribute will not be set.
+         * Set a request attribute to the value of a request parameter. If the parameter is not set then the attribute will not
+         * be set.
          *
          * @param p request parameter and attribute name
          *
@@ -415,7 +425,8 @@ public interface HttpRequestHandlerBuilder
         }
 
         /**
-         * Set a request attribute to the value of a request parameter. If the parameter is not set then the attribute will not be set.
+         * Set a request attribute to the value of a request parameter. If the parameter is not set then the attribute will not
+         * be set.
          *
          * @param a request attribute to set
          * @param p request parameter to retrieve
@@ -458,6 +469,22 @@ public interface HttpRequestHandlerBuilder
         default ChainBuilder sendOk( Supplier<? extends HttpEntity> supplier )
         {
             return add( r -> Actions.sendOk( r, supplier.get() ) );
+        }
+
+        default ChainBuilder sendOk()
+        {
+            return sendOk( "" );
+        }
+
+        default ChainBuilder sendOk( String s )
+        {
+            return sendOk( (Supplier<HttpEntity>) () -> {
+                try {
+                    return new StringEntity( "OK" );
+                } catch( UnsupportedEncodingException ex ) {
+                    return null;
+                }
+            } );
         }
 
         /**

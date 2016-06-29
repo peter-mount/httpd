@@ -16,6 +16,7 @@
 package onl.area51.httpd.rest;
 
 import java.io.StringWriter;
+import java.util.function.Supplier;
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObjectBuilder;
@@ -81,6 +82,16 @@ public class JsonEntity
             jw.write( s );
             return w.toString();
         }
+    }
+
+    public static Supplier<HttpEntity> encodeArray( Supplier<JsonArrayBuilder> s )
+    {
+        return () -> new JsonEntity( s.get().build() );
+    }
+
+    public static Supplier<HttpEntity> encodeObject( Supplier<JsonObjectBuilder> s )
+    {
+        return () -> new JsonEntity( s.get().build() );
     }
 
 }
