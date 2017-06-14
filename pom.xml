@@ -12,6 +12,19 @@
         A basic WebServer framework extending HTTP Components server
     </description>
     
+    <distributionManagement>
+        <repository>
+            <id>releases</id>
+            <name>Area51 Releases</name>
+            <url>https://nexus.area51.onl/repository/maven-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>snapshots</id>
+            <name>Area51 Snapshots</name>
+            <url>https://nexus.area51.onl/repository/maven-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+    
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
