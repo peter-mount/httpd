@@ -7,7 +7,7 @@ def mvn = {
         ' -v "$(pwd)":/work' +
         ' -w /work' +
         ' ' + buildImage +
-        'mvn ' + cmd
+        ' mvn ' + cmd
 }
 
 properties([
